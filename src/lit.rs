@@ -83,16 +83,6 @@ impl Lit {
 		}
 	}
 	
-	pub fn from(num: usize, value: LitValue) -> Result<Self, String> {
-		match value {
-			LTrue | LFalse => Ok(Lit {
-					var: Var::new(num),
-					value: value,
-				}),
-			LUndef => Err("undefined value".to_string()),
-		}
-	}
-	
 	pub fn var_num(&self) -> usize {
 		self.var.get_num()
 	}
@@ -138,14 +128,18 @@ impl fmt::Display for Lit {
 #[derive (Debug, Clone)]
 pub struct Clause {
 	vec_lit: Vec<Lit>,
+	vec_mark: Vec<bool>,
 	max_lit: Option<usize>,
+	len: usize,
 }
 
 impl Clause {
 	pub fn new() -> Self {
 		Clause {
 			vec_lit: Vec::<Lit>::new(),
+			vec_mark: Vec::<bool>::new(),
 			max_lit: None,
+			len: 0,
 		}
 	}
 	
@@ -155,14 +149,49 @@ impl Clause {
 			None => self.max_lit = Some(lit.var_num()), 
 		};
 		self.vec_lit.push(lit);
+		self.vec_mark.push(false);
+		self.len += 1;
 	}
 	
 	pub fn len(&self) -> usize {
-		self.vec_lit.len()
+		self.len
 	}
 	
-	pub fn get(&self, idx: usize) -> Lit {
-		self.vec_lit[idx]
+	pub fn get_all_lits(&self) -> &[Lit] {
+		&self.vec_lit
+	}
+	
+	pub fn get_first(&self) -> Option<Lit> {
+		if self.len > 0{
+			let mut i = 0;
+			while self.vec_mark[i] {
+				i += 1;
+			}
+			Some(self.vec_lit[i])
+		}else {
+			None
+		}
+	}
+	
+	pub fn remove(&mut self, idx: usize) {
+		if !self.vec_mark[idx] {
+			self.vec_mark[idx] = true;
+			self.len -= 1;
+		}
+	}
+	
+	pub fn restore(&mut self, idx: usize) {
+		if self.vec_mark[idx] {
+			self.vec_mark[idx] = false;
+			self.len += 1;
+		}
+	}
+	
+	pub fn restore_all(&mut self) {
+		self.len = self.vec_lit.len();
+		for i in 0..self.len {
+			self.vec_mark[i] = false;
+		}
 	}
 	
 	pub fn valid(&self, num: usize) -> bool {
@@ -177,11 +206,16 @@ impl Clause {
 impl fmt::Display for Clause {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(f, "(").unwrap();
+		let mut first = true;
+			
 		for i in 0..self.vec_lit.len() {
-			if i != 0 {
-				write!(f, "\\/").unwrap();
+			if !self.vec_mark[i] {
+				if !first {
+					write!(f, "\\/").unwrap();
+				}
+				first = false;
+				write!(f, "{}", self.vec_lit[i]).unwrap();
 			}
-			write!(f, "{}", self.vec_lit[i]).unwrap();
 		} 
 		write!(f, ")")
 	}
