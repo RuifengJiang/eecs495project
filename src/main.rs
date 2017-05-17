@@ -28,8 +28,8 @@ fn random_test() {
 	let mut solver = Solver::new();
 	{
 		let var_n = 1000;		// number of variables
-		let clause_ms = 40.;	// max size of each clause
-		let clause_mn = 40000.;	// number of clauses
+		let clause_ms = 20.;	// max size of each clause
+		let clause_mn = 20000.;	// number of clauses
 		let assign_mn = 10.;	// number of assignments (unit clauses)
 		
 		println!("Random Test: \n\tVar num: {}\n\tClause num: {}\n\tMax clause size: {}\n\tAssignment num: {}\n", var_n, clause_mn, clause_ms as usize, assign_mn as usize); 

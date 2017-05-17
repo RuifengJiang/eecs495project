@@ -30,6 +30,7 @@ impl fmt::Display for Var {
 pub enum LitValue {LTrue, LFalse, LUndef}
 
 impl LitValue {
+	// Unlike ==, LTrue.equals(LUndef) == true
 	pub fn equals(self, other: LitValue) -> bool {
 		match self {
 			LTrue => match other {
@@ -143,6 +144,7 @@ impl Clause {
 		}
 	}
 	
+	//add literal at the end of the clause
 	pub fn push(&mut self, lit: Lit) {
 		match self.max_lit {
 			Some(max_lit) => if max_lit < lit.var_num() {self.max_lit = Some(lit.var_num());},
@@ -157,10 +159,12 @@ impl Clause {
 		self.len
 	}
 	
+	//return all lits, including those are marked
 	pub fn get_all_lits(&self) -> &[Lit] {
 		&self.vec_lit
 	}
 	
+	//get first lit that is not marked
 	pub fn get_first(&self) -> Option<Lit> {
 		if self.len > 0{
 			let mut i = 0;
@@ -173,6 +177,7 @@ impl Clause {
 		}
 	}
 	
+	//logically remove one lit
 	pub fn remove(&mut self, idx: usize) {
 		if !self.vec_mark[idx] {
 			self.vec_mark[idx] = true;
@@ -180,6 +185,7 @@ impl Clause {
 		}
 	}
 	
+	//restore the removed lit
 	pub fn restore(&mut self, idx: usize) {
 		if self.vec_mark[idx] {
 			self.vec_mark[idx] = false;
@@ -187,6 +193,7 @@ impl Clause {
 		}
 	}
 	
+	//restore all lits, including not removed ones
 	pub fn restore_all(&mut self) {
 		self.len = self.vec_lit.len();
 		for i in 0..self.len {
@@ -194,6 +201,7 @@ impl Clause {
 		}
 	}
 	
+	//check if this clause is a valid clause, i.e. all lits are valid in the solver
 	pub fn valid(&self, num: usize) -> bool {
 		if let Some(lit) = self.max_lit {
 			lit < num
