@@ -72,8 +72,8 @@ impl fmt::Display for LitValue {
 
 #[derive (Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Lit {
-	var: Var,
-	value: LitValue,
+	var: 	Var,
+	value: 	LitValue,
 }
 
 impl Lit {
@@ -128,17 +128,15 @@ impl fmt::Display for Lit {
 
 #[derive (Debug, Clone)]
 pub struct Clause {
-	vec_lit: Vec<Lit>,
-	vec_mark: Vec<bool>,
-	max_lit: Option<usize>,
-	len: usize,
+	vec_lit: 	Vec<(Lit, bool)>,
+	max_lit: 	Option<usize>,
+	len: 		usize,
 }
 
 impl Clause {
 	pub fn new() -> Self {
 		Clause {
-			vec_lit: Vec::<Lit>::new(),
-			vec_mark: Vec::<bool>::new(),
+			vec_lit: Vec::<(Lit, bool)>::new(),
 			max_lit: None,
 			len: 0,
 		}
@@ -150,8 +148,7 @@ impl Clause {
 			Some(max_lit) => if max_lit < lit.var_num() {self.max_lit = Some(lit.var_num());},
 			None => self.max_lit = Some(lit.var_num()), 
 		};
-		self.vec_lit.push(lit);
-		self.vec_mark.push(false);
+		self.vec_lit.push((lit, false));
 		self.len += 1;
 	}
 	
@@ -160,7 +157,7 @@ impl Clause {
 	}
 	
 	//return all lits, including those are marked
-	pub fn get_all_lits(&self) -> &[Lit] {
+	pub fn get_all_lits(&self) -> &[(Lit, bool)] {
 		&self.vec_lit
 	}
 	
@@ -168,10 +165,10 @@ impl Clause {
 	pub fn get_first(&self) -> Option<Lit> {
 		if self.len > 0{
 			let mut i = 0;
-			while self.vec_mark[i] {
+			while self.vec_lit[i].1 {
 				i += 1;
 			}
-			Some(self.vec_lit[i])
+			Some(self.vec_lit[i].0)
 		}else {
 			None
 		}
@@ -179,16 +176,16 @@ impl Clause {
 	
 	//logically remove one lit
 	pub fn remove(&mut self, idx: usize) {
-		if !self.vec_mark[idx] {
-			self.vec_mark[idx] = true;
+		if !self.vec_lit[idx].1 {
+			self.vec_lit[idx].1 = true;
 			self.len -= 1;
 		}
 	}
 	
 	//restore the removed lit
 	pub fn restore(&mut self, idx: usize) {
-		if self.vec_mark[idx] {
-			self.vec_mark[idx] = false;
+		if self.vec_lit[idx].1 {
+			self.vec_lit[idx].1 = false;
 			self.len += 1;
 		}
 	}
@@ -197,7 +194,7 @@ impl Clause {
 	pub fn restore_all(&mut self) {
 		self.len = self.vec_lit.len();
 		for i in 0..self.len {
-			self.vec_mark[i] = false;
+			self.vec_lit[i].1 = false;
 		}
 	}
 	
@@ -217,12 +214,12 @@ impl fmt::Display for Clause {
 		let mut first = true;
 			
 		for i in 0..self.vec_lit.len() {
-			if !self.vec_mark[i] {
+			if !self.vec_lit[i].1 {
 				if !first {
 					write!(f, "\\/").unwrap();
 				}
 				first = false;
-				write!(f, "{}", self.vec_lit[i]).unwrap();
+				write!(f, "{}", self.vec_lit[i].0).unwrap();
 			}
 		} 
 		write!(f, ")")

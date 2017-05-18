@@ -61,7 +61,7 @@ fn verify(clauses: Vec<Clause>, model: Vec<LitValue>) -> bool {
 		let lits = &clauses[i].get_all_lits();
 		let mut result = false;
 		for j in 0..lits.len() {
-			let lit:Lit = lits[j];
+			let lit:Lit = lits[j].0;
 			if lit.get_value() == model[lit.var_num()] {
 				result = true;
 				break;

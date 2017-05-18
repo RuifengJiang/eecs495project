@@ -4,23 +4,62 @@ use std::collections::HashSet;
 use std::fmt;
 
 #[derive (Debug)]
-pub struct Solver {
-	clauses: Vec<Clause>,	//CNF
-	vec_sat: Vec<usize>,	//represent if the clause is satisfied or not. A clause is unsat implies vec_sat[ci] == 0  
-	len: usize,
-	num_var: usize,			//number of variables
-	model: Vec<LitValue>,	//the assignment of each variable
-	var_map: VarMap,		//saves the lists of position of each variable appear in CNF
-	propagated: Vec<bool>,	//if the value of a variable is propagated through CNF
-	status: bool,			//if the model is UNSAT or not. status == false implies the CNF is UNSAT.
+struct CNF {
+	clauses: 	Vec<Clause>,	//vector of clauses
+	sat: 		Vec<usize>,		//represent if the clause is satisfied or not. A clause is unsat implies vec_sat[ci] == 0
+}
+
+impl CNF {
+	fn new() -> Self {
+		CNF {
+			clauses: Vec::<Clause>::new(),
+			sat: Vec::<usize>::new(),		
+		}
+	}
+	
+	fn add_clause(&mut self, clause: Clause) {
+		self.clauses.push(clause);
+		self.sat.push(0);
+	}
+	
+	fn len(&self) -> usize {
+		self.clauses.len()
+	}
+}
+
+#[derive (Debug)]
+struct Model {
+	var: 		Vec<LitValue>,	//the assignment of each variable
+	map: 		VarMap,			//saves the lists of position of each variable appear in CNF
+	propagated: Vec<bool>,		//if the value of a variable is propagated through CNF
+}
+
+impl Model {
+	fn new() -> Self {
+		Model {
+			var: Vec::<LitValue>::new(),
+			map: VarMap::new(),
+			propagated: Vec::<bool>::new(),
+		}
+	}
+	
+	fn new_var(&mut self) {
+		self.var.push(LUndef);
+		self.propagated.push(false);
+		self.map.new_var();
+	}
+	
+	fn len(&self) -> usize {
+		self.var.len()
+	}
 }
 
 #[derive (Debug)]
 struct VarMap {
-	lit_num: usize,
-	vec_true: Vec<VarPosLit>,	//list of clauses where the variable is true
-	vec_false: Vec<VarPosLit>,	//list of clauses where the variable is false
-	cnt: Vec<usize>,
+	lit_num: 	usize,
+	vec_true: 	Vec<VarPosLit>,	//list of clauses where the variable is true
+	vec_false: 	Vec<VarPosLit>,	//list of clauses where the variable is false
+	cnt: 		Vec<usize>,
 }
 
 type VarPos = (usize, usize);
@@ -48,7 +87,7 @@ impl VarMap {
 	fn add_clause(&mut self, idx: usize, clause: &Clause) {
 		let lits = clause.get_all_lits();
 		for i in 0..lits.len() {
-			let lit = lits[i];
+			let lit = lits[i].0;
 			let var_num = lit.var_num();
 			self.cnt[var_num] += 1;
 			
@@ -60,11 +99,11 @@ impl VarMap {
 		}
 	}
 	
-	fn get_true_clauses(&self, lit: usize) -> &[VarPos] {
+	fn get_true_clauses_of(&self, lit: usize) -> &[VarPos] {
 		&self.vec_true[lit]
 	}
 	
-	fn get_false_clauses(&self, lit: usize) -> &[VarPos] {
+	fn get_false_clauses_of(&self, lit: usize) -> &[VarPos] {
 		&self.vec_false[lit]
 	}
 	
@@ -73,16 +112,22 @@ impl VarMap {
 	}
 }
 
+#[derive (Debug)]
+pub struct Solver {
+	cnf: 		CNF,	//CNF  
+	len: 		usize,
+	num_var: 	usize,	//number of variables
+	model: 		Model,
+	status: 	bool,	//if the model is UNSAT or not. status == false implies the CNF is UNSAT.
+}
+
 impl Solver {
 	pub fn new() -> Self {
 		Solver {
-			clauses: Vec::<Clause>::new(),
-			vec_sat: Vec::<usize>::new(),
+			cnf: CNF::new(),
 			len: 0,
 			num_var: 0,
-			model: Vec::<LitValue>::new(),
-			var_map: VarMap::new(),			
-			propagated: Vec::<bool>::new(),
+			model: Model::new(),
 			status: true,
 		}
 	}
@@ -101,10 +146,8 @@ impl Solver {
 	//create a new variable
 	pub fn new_var(&mut self) -> Var {
 		let num = self.num_var;
-		self.model.push(LUndef);
-		self.propagated.push(false);
+		self.model.new_var();
 		self.num_var += 1;
-		self.var_map.new_var();
 		Var::new(num)
 	}
 	
@@ -118,28 +161,25 @@ impl Solver {
 			if clause.len() == 1 {
 				let lit = clause.get_first().unwrap();
 				//if this assignment is conflict to others
-				if lit.get_value().equals(self.model[lit.var_num()]) {
+				if lit.get_value().equals(self.model.var[lit.var_num()]) {
 					//if such an assignment has been performed before
-					if self.model[lit.var_num()] == LUndef {
-						self.model[lit.var_num()] = lit.get_value();
+					if self.model.var[lit.var_num()] == LUndef {
+						self.model.var[lit.var_num()] = lit.get_value();
 						
-						self.var_map.add_clause(self.len, &clause);
+						self.model.map.add_clause(self.len, &clause);
 						self.len += 1;
-						self.clauses.push(clause);
-						self.vec_sat.push(0);
+						self.cnf.add_clause(clause);
 					}
 				}else {
 					//conflict assignment
-					self.clauses.push(clause);
-					self.vec_sat.push(0);
+					self.cnf.add_clause(clause);
 					self.status = false;
 				}
 			}else {
 				//add a regular clause into the solver
-				self.var_map.add_clause(self.len, &clause);
+				self.model.map.add_clause(self.len, &clause);
 				self.len += 1;
-				self.clauses.push(clause);
-				self.vec_sat.push(0);
+				self.cnf.add_clause(clause);
 			}
 			Ok(self.status)
 		}else {
@@ -157,17 +197,17 @@ impl Solver {
 	}
 	
 	pub fn get_model(&self) -> Vec<LitValue> {
-		self.model.clone()
+		self.model.var.clone()
 	}
 	
 	pub fn get_oringin_clauses(&self) -> Vec<Clause> {
-		self.clauses.clone()
+		self.cnf.clauses.clone()
 	}
 	
 	pub fn print_model(&self) {
 		if self.status {
 			for i in 0..self.model.len() {
-				print!("{}", self.model[i]);
+				print!("{}", self.model.var[i]);
 			}
 			println!();
 		}else {
@@ -182,13 +222,13 @@ impl Solver {
 				let mut propagated = false;
 				for i in 0..self.num_var {
 					//if the currented var is true and not propagated yet
-					if self.model[i] == LTrue && !self.propagated[i] {
+					if self.model.var[i] == LTrue && !self.model.propagated[i] {
 						propagated = true;
 						//propagate the value forward
 						self.propagate(i, true, true);
 					
 					//if the currented var is false and not propagated yet
-					}else if self.model[i] == LFalse && !self.propagated[i] {
+					}else if self.model.var[i] == LFalse && !self.model.propagated[i] {
 						propagated = true;
 						//propagate the value forward
 						self.propagate(i, false, true);
@@ -207,10 +247,10 @@ impl Solver {
 	fn perform_assignments(&mut self) -> bool {
 		let mut result = false;
 		for i in 0..self.len {
-			if self.vec_sat[i] == 0 && self.clauses[i].len() == 1 {
+			if self.cnf.sat[i] == 0 && self.cnf.clauses[i].len() == 1 {
 				result = true;
-				let lit = self.clauses[i].get_first().unwrap();
-				self.model[lit.var_num()] = lit.get_value(); 
+				let lit = self.cnf.clauses[i].get_first().unwrap();
+				self.model.var[lit.var_num()] = lit.get_value(); 
 			}
 		}
 		result
@@ -219,30 +259,30 @@ impl Solver {
 	//propagate the value throughout the CNF
 	//forward: true means perform the propagation, false means undo the propagation
 	fn propagate(&mut self, i: usize, value: bool, forward: bool) {
-		self.propagated[i] = forward;
+		self.model.propagated[i] = forward;
 		let sat_list;
 		let unsat_list;
 		
 		if value {
-			sat_list = self.var_map.get_true_clauses(i);
-			unsat_list = self.var_map.get_false_clauses(i);
+			sat_list = self.model.map.get_true_clauses_of(i);
+			unsat_list = self.model.map.get_false_clauses_of(i);
 		}else {
-			sat_list = self.var_map.get_false_clauses(i);
-			unsat_list = self.var_map.get_true_clauses(i);
+			sat_list = self.model.map.get_false_clauses_of(i);
+			unsat_list = self.model.map.get_true_clauses_of(i);
 		}
 					
-		for j in 0..sat_list.len() {
+		for j in sat_list {
 			if forward {
-				self.vec_sat[sat_list[j].0] += 1;
+				self.cnf.sat[j.0] += 1;
 			}else {
-				self.vec_sat[sat_list[j].0] -= 1;
+				self.cnf.sat[j.0] -= 1;
 			}
 		}
-		for j in 0..unsat_list.len() {
+		for j in unsat_list {
 			if forward {
-				self.clauses[unsat_list[j].0].remove(unsat_list[j].1);
+				self.cnf.clauses[j.0].remove(j.1);
 			}else {
-				self.clauses[unsat_list[j].0].restore(unsat_list[j].1);
+				self.cnf.clauses[j.0].restore(j.1);
 			}
 		}
 	}
@@ -262,16 +302,16 @@ impl Solver {
 		
 		//check if CNF is sat, unsat, or undetermined and find if there is any assignment 
 		for i in 0..self.len {
-			if self.vec_sat[i] == 0 {
+			if self.cnf.sat[i] == 0 {
 				all_sat = false;
 				
 				//empty clause means unsat
-				if self.clauses[i].len() == 0 {
+				if self.cnf.clauses[i].len() == 0 {
 					empty_clause = true;
 					break;
 				//check if it is unit clause
-				}else if self.clauses[i].len() == 1 {
-					assignments.push(self.clauses[i].get_first().unwrap());
+				}else if self.cnf.clauses[i].len() == 1 {
+					assignments.push(self.cnf.clauses[i].get_first().unwrap());
 				}
 			}
 		}
@@ -298,7 +338,7 @@ impl Solver {
 					//propagate the value forward
 					let var_num = lit.var_num();
 					let var_value = lit.get_value();
-					self.model[var_num] = var_value;
+					self.model.var[var_num] = var_value;
 					self.propagate(var_num, var_value == LTrue, true);
 				}
 			}
@@ -308,7 +348,7 @@ impl Solver {
 				for lit in proped_lits {
 					let var_num = lit.var_num();
 					let var_value = lit.get_value();
-					self.model[var_num] = LUndef;
+					self.model.var[var_num] = LUndef;
 					self.propagate(var_num, var_value == LTrue, false);
 				}
 				false
@@ -320,7 +360,7 @@ impl Solver {
 			let var_num = self.choose_var();
 			
 			//set the value to be true
-			self.model[var_num] = LTrue;
+			self.model.var[var_num] = LTrue;
 			self.propagate(var_num, true, true);
 			
 			//if CNF is sat under the assignment
@@ -329,13 +369,13 @@ impl Solver {
 				self.propagate(var_num, true, false);
 				
 				//set the value to be false
-				self.model[var_num] = LFalse;
+				self.model.var[var_num] = LFalse;
 				self.propagate(var_num, false, true);
 				
 				//if CNF is sat under the assignment
 				if !self.recur_solve() {
 					//undo the propagation
-					self.model[var_num] = LUndef;
+					self.model.var[var_num] = LUndef;
 					self.propagate(var_num, false, false);
 					return false;
 				}
@@ -349,27 +389,26 @@ impl Solver {
 		let mut max_cnt = 0;
 		let mut var_num = 0;
 		for i in 0..self.num_var {
-			if self.var_map.get_cnt(i) > max_cnt && !self.propagated[i] {
-				max_cnt = self.var_map.get_cnt(i); 
+			if self.model.map.get_cnt(i) > max_cnt && !self.model.propagated[i] {
+				max_cnt = self.model.map.get_cnt(i); 
 				var_num = i;
 			}
 		}
 		var_num
 	}
 	
-	
 	//reset the solver to the state before solving and simplifying
 	pub fn reset(&mut self) {
-		for i in 0..self.propagated.len() {
-			self.propagated[i] = false;
-			self.model[i] = LUndef;
+		for i in 0..self.model.len() {
+			self.model.propagated[i] = false;
+			self.model.var[i] = LUndef;
 		}
 		for i in 0..self.len {
-			self.vec_sat[i] = 0;
-			self.clauses[i].restore_all();
-			if self.clauses[i].len() == 1 {
-				let lit = self.clauses[i].get_first().unwrap();
-				self.model[lit.var_num()] = lit.get_value();
+			self.cnf.sat[i] = 0;
+			self.cnf.clauses[i].restore_all();
+			if self.cnf.clauses[i].len() == 1 {
+				let lit = self.cnf.clauses[i].get_first().unwrap();
+				self.model.var[lit.var_num()] = lit.get_value();
 			}
 		}
 	}
@@ -378,13 +417,13 @@ impl Solver {
 impl fmt::Display for Solver {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		let mut first = true;
-		for i in 0..self.clauses.len() {
-			if self.vec_sat[i] == 0 {
+		for i in 0..self.cnf.len() {
+			if self.cnf.sat[i] == 0 {
 				if !first {
 					write!(f, "/\\").unwrap();
 				}
 				first = false;
-				write!(f, "{}", self.clauses[i]).unwrap();
+				write!(f, "{}", self.cnf.clauses[i]).unwrap();
 			}
 		}
 		write!(f, "")
