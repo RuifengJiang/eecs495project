@@ -1,6 +1,7 @@
 use lit::*;
 use lit::LitValue::*;
 use std::fmt;
+use std::collections::HashSet;
 
 #[derive (Debug)]
 struct CNF {
@@ -117,6 +118,7 @@ pub struct Solver {
 	num_var: 	usize,	//number of variables
 	model: 		Model,
 	status: 	bool,	//if the model is UNSAT or not. status == false implies the CNF is UNSAT.
+	iter_num:	usize,
 }
 
 impl Solver {
@@ -127,6 +129,7 @@ impl Solver {
 			num_var: 	0,
 			model: 		Model::new(),
 			status: 	true,
+			iter_num:	0,
 		}
 	}
 	
@@ -147,6 +150,10 @@ impl Solver {
 		self.model.new_var();
 		self.num_var += 1;
 		Var::new(num)
+	}
+	
+	pub fn set_iter_num(&mut self, num: usize) {
+		self.iter_num = num;
 	}
 	
 	//add one clause into the solver
@@ -225,7 +232,7 @@ impl Solver {
 						let var = self.model.var[i];
 						if var != LUndef {
 							//propagate the value forward
-							let empty = self.propagate(i, var, true);
+							let empty = self.propagate(i, var, true, None);
 							if empty {
 								self.status = false;
 								return false;
@@ -257,7 +264,7 @@ impl Solver {
 	
 	//propagate the value throughout the CNF
 	//forward: true means perform the propagation, false means undo the propagation
-	fn propagate(&mut self, var: usize, value: LitValue, forward: bool) -> bool {
+	fn propagate(&mut self, var: usize, value: LitValue, forward: bool, mut assignment_set: Option<&mut HashSet<usize>>) -> bool {
 		self.model.propagated[var] = forward;
 		let sat_list;
 		let unsat_list;
@@ -286,30 +293,36 @@ impl Solver {
 		}
 		for j in unsat_list {
 			if forward {
-				self.cnf.clauses[j.0].remove(j.1);
-				//check if the clause is empty
-				let len = self.cnf.clauses[j.0].len();
-				if len == 0 {
-					result = true;
-				//check if the clause becomes an assignment	
-				}else if len == 1 {
-					//get the lit from the assignment
-					let lit = self.cnf.clauses[j.0].get_first().unwrap();
-					let var = lit.var_num();
-					let value = lit.get_value();
-					//add assignment count by one
-					self.model.expected[var].1 += 1;
-					
-					//check if there is a conflict on the assignment
-					if self.model.expected[var].0.equals(value) {
-						self.model.expected[var].0 = value;
-					}else {
+				if self.cnf.sat[j.0] == 0 {
+					self.cnf.clauses[j.0].remove(j.1);
+					//check if the clause is empty
+					let len = self.cnf.clauses[j.0].len();
+					if len == 0 {
 						result = true;
+					//check if the clause becomes an assignment	
+					}else if len == 1 {
+						//get the lit from the assignment
+						let lit = self.cnf.clauses[j.0].get_first().unwrap();
+						let var = lit.var_num();
+						let value = lit.get_value();
+						//add assignment count by one
+						self.model.expected[var].1 += 1;
+						
+						if let Some(ref mut set) = assignment_set {
+							set.insert(var);
+						}
+						
+						//check if there is a conflict on the assignment
+						if self.model.expected[var].0.equals(value) {
+							self.model.expected[var].0 = value;
+						}else {
+							result = true;
+						}
 					}
 				}
 			}else {
 				//check if the clause is an assignment
-				if self.cnf.clauses[j.0].len() == 1 {
+				if self.cnf.sat[j.0] == 0 && self.cnf.clauses[j.0].len() == 1 {
 					let lit = self.cnf.clauses[j.0].get_first().unwrap();
 					let var = lit.var_num();
 					self.model.expected[var].1 -= 1;
@@ -317,6 +330,9 @@ impl Solver {
 					//undo assignment
 					if self.model.expected[var].1 == 0 {
 						self.model.expected[var].0 = LUndef;
+						if let Some(ref mut set) = assignment_set {
+							set.remove(&var);
+						}
 					}
 				}
 				
@@ -335,9 +351,14 @@ impl Solver {
 			let mut cnt = 0;	//iteration count
 			let mut next_lit = None;
 			let mut front_pt = 0;
+			let mut assignment_set = HashSet::<usize>::new();
+			
 			loop {
 				cnt += 1;
-				if cnt % (self.num_var / 10) == 0 {
+//				if cnt > 15  {
+//					break;
+//				}
+				if self.iter_num != 0 && cnt % self.iter_num == 0 {
 					println!("Iteration: {}", cnt);
 				}
 				
@@ -348,11 +369,12 @@ impl Solver {
 					}
 					let mut next_var = front_pt;
 					
-					for i in next_var..self.model.len() {
-						if !self.model.propagated[i] && (self.model.expected[i].1 != 0 || self.model.var[i] != LUndef) {
-							next_var = i;
+					if !assignment_set.is_empty() {
+						for i in assignment_set.iter() {
+							next_var = *i;
 							break;
 						}
+						assignment_set.remove(&next_var);
 					}
 					
 					//check if the next var only can be false
@@ -374,6 +396,14 @@ impl Solver {
 				let var = lit.var_num();
 				let value;
 				
+//				println!("{}", self);
+//				self.print_model();
+//				println!("{}", lit);
+//				for i in assignment_set.iter() {
+//					print!("{}, ", i)
+//				}
+//				println!();
+									
 				//check if is an assignment from original CNF
 				if self.model.var[var] == LUndef {
 					value = lit.get_value();
@@ -387,7 +417,9 @@ impl Solver {
 				}
 				
 				//propagate the value and get if there is any empty clause
-				let empty_clause = self.propagate(var, value, true);
+				let empty_clause = self.propagate(var, value, true, Some(&mut assignment_set));
+				
+//				println!("{}", self);
 				
 				if empty_clause {
 					//undo propagation based on history stack
@@ -399,7 +431,7 @@ impl Solver {
 							front_pt -= var;
 						}
 						//undo propagation
-						self.propagate(var, val, false);
+						self.propagate(var, val, false, Some(&mut assignment_set));
 						self.model.var[var] = LUndef;
 						match next {
 							//if the var can be another value, use that value for next iteration
@@ -416,7 +448,9 @@ impl Solver {
 					next_lit = None;
 				}
 			}
-			println!("Total iteration: {}", cnt);
+			if self.iter_num != 0 {
+				println!("Total iteration: {}", cnt);
+			}
 		}
 		self.status
 	}

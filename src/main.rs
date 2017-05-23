@@ -28,16 +28,51 @@ fn main() {
 ////	println!("{}", solver);	
 //	println!("{}", solver.solve());
 //	solver.print_model();
-	random_test();
+	println!("Correctness Test: ");
+	random_correctness_test(1000);
+	println!("\nSpeed Test: ");
+	random_speed_test(10);
 }
 
-fn random_test() {
-	for i in 0..5 {
+fn random_correctness_test(num: usize) {
+	for i in 0..num {
+		if i % 100 == 0 {
+			println!("Correctness test num: {}", i);
+		} 
+		let mut solver = Solver::new();
+		{
+			let var_n = 100;		// number of variables
+			let clause_ms = 5.;	// max size of each clause
+			let clause_mn = 1000.;	// number of clauses
+			let assign_mn = 0.;	// number of assignments (unit clauses)
+			
+			let mut lits = Vec::<Lit>::new();
+			
+			for i in solver.create_vars(var_n) {
+				lits.push(Lit::new(i));
+			}
+		
+			random_clauses(&mut solver, lits, var_n as f32, clause_ms, clause_mn, assign_mn, false);
+		}
+		
+		let clauses = solver.get_oringin_clauses();
+		
+		let sat = solver.solve();
+		if sat && !verify(clauses, solver.get_model()) {
+			println!("Wrong Model");
+			return;
+		}
+	}
+	println!("Test Passed");
+}
+
+fn random_speed_test(num: usize) {
+	for i in 0..num {
 		let mut solver = Solver::new();
 		{
 			let var_n = 10000;		// number of variables
-			let clause_ms = 40.;	// max size of each clause
-			let clause_mn = 150000.;	// number of clauses
+			let clause_ms =40.;	// max size of each clause
+			let clause_mn = 100000.;	// number of clauses
 			let assign_mn = 20.;	// number of assignments (unit clauses)
 			
 			println!("Random Test {}: \n\tVar num: {}\n\tMax clause num: {}\n\tMax clause size: {}\n\tMax assignment num: {}\n", i + 1, var_n, clause_mn, clause_ms as usize, assign_mn as usize); 
@@ -49,9 +84,11 @@ fn random_test() {
 			}
 		
 			println!("Generating CNF...\n");	
-			random_clauses(&mut solver, lits, var_n as f32, clause_ms, clause_mn, assign_mn);
+			random_clauses(&mut solver, lits, var_n as f32, clause_ms, clause_mn, assign_mn, true);
 	//		println!("{}", solver);
 		}
+		
+		solver.set_iter_num(1000);
 		
 		let clauses = solver.get_oringin_clauses();
 		
@@ -61,11 +98,12 @@ fn random_test() {
 		let sat = solver.solve();
 		let end_time = now();
 		let duration = end_time - start_time;
-		println!("Total time: {}.{} s", duration.num_seconds(), duration.num_milliseconds() - duration.num_seconds() * 1000);
+		print!("Total time: {}.{} s\t", duration.num_seconds(), duration.num_milliseconds() - duration.num_seconds() * 1000);
 		
-		solver.print_model();
+//		solver.print_model();
 		
-		println!("Match: {}\n\n======================================================\n", if sat {verify(clauses, solver.get_model())} else {true});
+		print!("SAT: {}\t", sat);
+		println!("Result Match: {}\n\n======================================================\n", if sat {verify(clauses, solver.get_model())} else {true});
 		solver.reset();
 	}
 }
@@ -88,10 +126,10 @@ fn verify(clauses: Vec<Clause>, model: &[LitValue]) -> bool {
 	true
 }
 
-fn random_clauses(solver: &mut Solver, x: Vec<Lit>, lit_n: f32, clause_ms: f32, clause_mn: f32, assign_mn: f32) {
+fn random_clauses(solver: &mut Solver, x: Vec<Lit>, lit_n: f32, clause_ms: f32, clause_mn: f32, assign_mn: f32, print: bool) {
 	let mut rng = rand::thread_rng();
 	
-	let assign_n = (rng.next_f32() * assign_mn + 1.).floor() as usize;
+	let assign_n = (rng.next_f32() * assign_mn).floor() as usize;
 	for _ in 0..assign_n {
 		let lit_num = (rng.next_f32() * lit_n).floor() as usize;
 		if rng.gen() {
@@ -118,6 +156,8 @@ fn random_clauses(solver: &mut Solver, x: Vec<Lit>, lit_n: f32, clause_ms: f32, 
 //		println!("{}", clause);
 		solver.add_clause(clause).unwrap();
 	}
-	println!("\tClause num: {}\n\tTotal clause size: {}\n\tAssignment num: {}\n", clause_n, total_size, assign_n);
+	if print {
+		println!("\tClause num: {}\n\tTotal clause size: {}\n\tAssignment num: {}\n", clause_n, total_size, assign_n);
+	}
 //	println!("{}", solver);
 }
