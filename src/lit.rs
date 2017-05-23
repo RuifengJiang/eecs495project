@@ -3,7 +3,7 @@ use std::fmt;
 use std::cmp::*;
 use lit::LitValue::*;
 
-#[derive (Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive (Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Var {
 	num: usize
 }
@@ -26,7 +26,7 @@ impl fmt::Display for Var {
     }
 }
 
-#[derive (Debug, Copy, Clone, PartialEq, Eq)]
+#[derive (Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum LitValue {LTrue, LFalse, LUndef}
 
 impl LitValue {
@@ -70,7 +70,7 @@ impl fmt::Display for LitValue {
 	} 
 }
 
-#[derive (Debug, Copy, Clone, PartialEq, Eq)]
+#[derive (Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Lit {
 	var: 	Var,
 	value: 	LitValue,
@@ -79,8 +79,15 @@ pub struct Lit {
 impl Lit {
 	pub fn new(var: Var) -> Self {
 		Lit {
-			var: var,
-			value: LTrue,
+			var: 	var,
+			value: 	LTrue,
+		}
+	}
+	
+	pub fn create(var_num: usize, val: LitValue) -> Self {
+		Lit {
+			var: 	Var::new(var_num),
+			value: 	val,
 		}
 	}
 	
@@ -98,8 +105,8 @@ impl Not for Lit {
 
 	fn not(self) -> Lit {
 		Lit {
-			var: self.var,
-			value: !self.value,
+			var: 	self.var,
+			value: 	!self.value,
 		}
 	}
 }
@@ -136,9 +143,9 @@ pub struct Clause {
 impl Clause {
 	pub fn new() -> Self {
 		Clause {
-			vec_lit: Vec::<(Lit, bool)>::new(),
-			max_lit: None,
-			len: 0,
+			vec_lit: 	Vec::<(Lit, bool)>::new(),
+			max_lit: 	None,
+			len: 		0,
 		}
 	}
 	

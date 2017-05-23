@@ -1,6 +1,5 @@
 use lit::*;
 use lit::LitValue::*;
-use std::collections::HashSet;
 use std::fmt;
 
 #[derive (Debug)]
@@ -12,8 +11,8 @@ struct CNF {
 impl CNF {
 	fn new() -> Self {
 		CNF {
-			clauses: Vec::<Clause>::new(),
-			sat: Vec::<usize>::new(),		
+			clauses: 	Vec::<Clause>::new(),
+			sat: 		Vec::<usize>::new(),		
 		}
 	}
 	
@@ -29,22 +28,25 @@ impl CNF {
 
 #[derive (Debug)]
 struct Model {
-	var: 		Vec<LitValue>,	//the assignment of each variable
-	map: 		VarMap,			//saves the lists of position of each variable appear in CNF
-	propagated: Vec<bool>,		//if the value of a variable is propagated through CNF
+	var: 		Vec<LitValue>,				//the assignment of each variable
+	expected:	Vec<(LitValue, usize)>,		//expected value of variable during sovling process
+	map: 		VarMap,						//saves the lists of position of each variable appear in CNF
+	propagated: Vec<bool>,					//if the value of a variable is propagated through CNF
 }
 
 impl Model {
 	fn new() -> Self {
 		Model {
-			var: Vec::<LitValue>::new(),
-			map: VarMap::new(),
+			var: 		Vec::<LitValue>::new(),
+			expected:	Vec::<(LitValue, usize)>::new(),
+			map: 		VarMap::new(),
 			propagated: Vec::<bool>::new(),
 		}
 	}
 	
 	fn new_var(&mut self) {
 		self.var.push(LUndef);
+		self.expected.push((LUndef, 0));
 		self.propagated.push(false);
 		self.map.new_var();
 	}
@@ -56,59 +58,55 @@ impl Model {
 
 #[derive (Debug)]
 struct VarMap {
-	lit_num: 	usize,
-	vec_true: 	Vec<VarPosLit>,	//list of clauses where the variable is true
-	vec_false: 	Vec<VarPosLit>,	//list of clauses where the variable is false
-	cnt: 		Vec<usize>,
+	lit_num: 			usize,
+	true_clause_list: 	Vec<VarPosList>,		//list of clauses where the variable is true
+	false_clause_list: 	Vec<VarPosList>,		//list of clauses where the variable is false
+	cnt: 				Vec<usize>,
 }
 
 type VarPos = (usize, usize);
-type VarPosLit = Vec<VarPos>;
+type VarPosList = Vec<VarPos>;
 
 impl VarMap {
 	fn new() -> Self {
 		VarMap {
 			lit_num: 0,
-			vec_true: Vec::<VarPosLit>::new(),
-			vec_false: Vec::<VarPosLit>::new(),
-			cnt: Vec::<usize>::new(),
+			true_clause_list: 	Vec::<VarPosList>::new(),
+			false_clause_list: 	Vec::<VarPosList>::new(),
+			cnt: 				Vec::<usize>::new(),
 		}
 	}
 	
 	//add a new variable
 	fn new_var(&mut self) {
 		self.lit_num += 1;
-		self.vec_true.push(Vec::<VarPos>::new());
-		self.vec_false.push(Vec::<VarPos>::new());
+		self.true_clause_list.push(Vec::<VarPos>::new());
+		self.false_clause_list.push(Vec::<VarPos>::new());
 		self.cnt.push(0);
 	}
 	
 	//add a new clause
 	fn add_clause(&mut self, idx: usize, clause: &Clause) {
 		let lits = clause.get_all_lits();
-		for i in 0..lits.len() {
-			let lit = lits[i].0;
+		for (i, tuple) in lits.iter().enumerate() {
+			let lit = tuple.0;
 			let var_num = lit.var_num();
 			self.cnt[var_num] += 1;
 			
 			if lit.get_value() == LTrue {
-				self.vec_true[var_num].push((idx, i));
+				self.true_clause_list[var_num].push((idx, i));
 			}else {
-				self.vec_false[var_num].push((idx, i));
+				self.false_clause_list[var_num].push((idx, i));
 			}
 		}
 	}
 	
-	fn get_true_clauses_of(&self, lit: usize) -> &[VarPos] {
-		&self.vec_true[lit]
-	}
-	
-	fn get_false_clauses_of(&self, lit: usize) -> &[VarPos] {
-		&self.vec_false[lit]
-	}
-	
-	fn get_cnt(&self, lit: usize) -> usize {
-		self.cnt[lit]
+	fn get_clauses_of(&self, var: usize, val: LitValue) -> &[VarPos] {
+		if val == LTrue {
+			&self.true_clause_list[var]
+		}else {
+			&self.false_clause_list[var]
+		}
 	}
 }
 
@@ -124,11 +122,11 @@ pub struct Solver {
 impl Solver {
 	pub fn new() -> Self {
 		Solver {
-			cnf: CNF::new(),
-			len: 0,
-			num_var: 0,
-			model: Model::new(),
-			status: true,
+			cnf: 		CNF::new(),
+			len: 		0,
+			num_var: 	0,
+			model: 		Model::new(),
+			status: 	true,
 		}
 	}
 	
@@ -166,7 +164,7 @@ impl Solver {
 					if self.model.var[lit.var_num()] == LUndef {
 						self.model.var[lit.var_num()] = lit.get_value();
 						
-						self.model.map.add_clause(self.len, &clause);
+						self.model.map.add_clause(self.cnf.len(), &clause);
 						self.len += 1;
 						self.cnf.add_clause(clause);
 					}
@@ -177,7 +175,7 @@ impl Solver {
 				}
 			}else {
 				//add a regular clause into the solver
-				self.model.map.add_clause(self.len, &clause);
+				self.model.map.add_clause(self.cnf.len(), &clause);
 				self.len += 1;
 				self.cnf.add_clause(clause);
 			}
@@ -196,8 +194,8 @@ impl Solver {
 		self.add_clause(c)
 	}
 	
-	pub fn get_model(&self) -> Vec<LitValue> {
-		self.model.var.clone()
+	pub fn get_model(&self) -> &[LitValue] {
+		&self.model.var
 	}
 	
 	pub fn get_oringin_clauses(&self) -> Vec<Clause> {
@@ -206,8 +204,8 @@ impl Solver {
 	
 	pub fn print_model(&self) {
 		if self.status {
-			for i in 0..self.model.len() {
-				print!("{}", self.model.var[i]);
+			for var in self.model.var.iter() {
+				print!("{}", var);
 			}
 			println!();
 		}else {
@@ -222,16 +220,17 @@ impl Solver {
 				let mut propagated = false;
 				for i in 0..self.num_var {
 					//if the currented var is true and not propagated yet
-					if self.model.var[i] == LTrue && !self.model.propagated[i] {
+					if !self.model.propagated[i] {
 						propagated = true;
-						//propagate the value forward
-						self.propagate(i, true, true);
-					
-					//if the currented var is false and not propagated yet
-					}else if self.model.var[i] == LFalse && !self.model.propagated[i] {
-						propagated = true;
-						//propagate the value forward
-						self.propagate(i, false, true);
+						let var = self.model.var[i];
+						if var != LUndef {
+							//propagate the value forward
+							let empty = self.propagate(i, var, true);
+							if empty {
+								self.status = false;
+								return false;
+							}
+						}
 					}
 				}
 				//if no propagation is performed or there is no more unit clause
@@ -246,7 +245,7 @@ impl Solver {
 	//check if there is any assignment (unit clause) in the CNF
 	fn perform_assignments(&mut self) -> bool {
 		let mut result = false;
-		for i in 0..self.len {
+		for i in 0..self.cnf.len() {
 			if self.cnf.sat[i] == 0 && self.cnf.clauses[i].len() == 1 {
 				result = true;
 				let lit = self.cnf.clauses[i].get_first().unwrap();
@@ -258,152 +257,178 @@ impl Solver {
 	
 	//propagate the value throughout the CNF
 	//forward: true means perform the propagation, false means undo the propagation
-	fn propagate(&mut self, i: usize, value: bool, forward: bool) {
-		self.model.propagated[i] = forward;
+	fn propagate(&mut self, var: usize, value: LitValue, forward: bool) -> bool {
+		self.model.propagated[var] = forward;
 		let sat_list;
 		let unsat_list;
+		let mut result = false;
 		
-		if value {
-			sat_list = self.model.map.get_true_clauses_of(i);
-			unsat_list = self.model.map.get_false_clauses_of(i);
+		if value == LTrue {
+			sat_list = self.model.map.get_clauses_of(var, LTrue);
+			unsat_list = self.model.map.get_clauses_of(var, LFalse);
 		}else {
-			sat_list = self.model.map.get_false_clauses_of(i);
-			unsat_list = self.model.map.get_true_clauses_of(i);
+			sat_list = self.model.map.get_clauses_of(var, LFalse);
+			unsat_list = self.model.map.get_clauses_of(var, LTrue);
 		}
-					
+
 		for j in sat_list {
 			if forward {
+				if self.cnf.sat[j.0] == 0 {
+					self.len -= 1;
+				}
 				self.cnf.sat[j.0] += 1;
 			}else {
 				self.cnf.sat[j.0] -= 1;
+				if self.cnf.sat[j.0] == 0 {
+					self.len += 1;
+				}
 			}
 		}
 		for j in unsat_list {
 			if forward {
 				self.cnf.clauses[j.0].remove(j.1);
+				//check if the clause is empty
+				let len = self.cnf.clauses[j.0].len();
+				if len == 0 {
+					result = true;
+				//check if the clause becomes an assignment	
+				}else if len == 1 {
+					//get the lit from the assignment
+					let lit = self.cnf.clauses[j.0].get_first().unwrap();
+					let var = lit.var_num();
+					let value = lit.get_value();
+					//add assignment count by one
+					self.model.expected[var].1 += 1;
+					
+					//check if there is a conflict on the assignment
+					if self.model.expected[var].0.equals(value) {
+						self.model.expected[var].0 = value;
+					}else {
+						result = true;
+					}
+				}
 			}else {
+				//check if the clause is an assignment
+				if self.cnf.clauses[j.0].len() == 1 {
+					let lit = self.cnf.clauses[j.0].get_first().unwrap();
+					let var = lit.var_num();
+					self.model.expected[var].1 -= 1;
+					
+					//undo assignment
+					if self.model.expected[var].1 == 0 {
+						self.model.expected[var].0 = LUndef;
+					}
+				}
+				
 				self.cnf.clauses[j.0].restore(j.1);
 			}
 		}
+		result
 	}
 
 	pub fn solve(&mut self) -> bool {
 		if self.status {
-			self.simplify();
-			self.status = self.recur_solve();
+			if !self.simplify() {
+				return false;
+			}
+			let mut hist = Vec::<(Lit, Option<Lit>)>::new();	//history stack
+			let mut cnt = 0;	//iteration count
+			let mut next_lit = None;
+			let mut front_pt = 0;
+			loop {
+				cnt += 1;
+				if cnt % (self.num_var / 10) == 0 {
+					println!("Iteration: {}", cnt);
+				}
+				
+				//check if need to find a new var to propagate
+				if next_lit == None {
+					while self.model.propagated[front_pt] {
+						front_pt += 1;
+					}
+					let mut next_var = front_pt;
+					
+					for i in next_var..self.model.len() {
+						if !self.model.propagated[i] && (self.model.expected[i].1 != 0 || self.model.var[i] != LUndef) {
+							next_var = i;
+							break;
+						}
+					}
+					
+					//check if the next var only can be false
+					if self.model.map.get_clauses_of(next_var, LTrue).len() == 0 || self.model.expected[next_var].0 == LFalse {
+						let lit = Lit::create(next_var, LFalse);
+						next_lit = Some((lit, None));
+					//check if the next var	only can be true
+					}else if self.model.map.get_clauses_of(next_var, LFalse).len() == 0  || self.model.expected[next_var].0 == LTrue {
+						let lit = Lit::create(next_var, LTrue);
+						next_lit = Some((lit, None));
+					//the value can be either true or false	
+					}else {
+						let lit = Lit::create(next_var, LTrue);
+						next_lit = Some((lit, Some(!lit)));
+					}
+				}
+
+				let lit = next_lit.unwrap().0;
+				let var = lit.var_num();
+				let value;
+				
+				//check if is an assignment from original CNF
+				if self.model.var[var] == LUndef {
+					value = lit.get_value();
+					self.model.var[var] = value;
+					//add the propagation into history stack
+					hist.push(next_lit.unwrap());
+				}else {
+					//use the value from the original CNF assignment
+					value = self.model.var[var];
+					next_lit = None;
+				}
+				
+				//propagate the value and get if there is any empty clause
+				let empty_clause = self.propagate(var, value, true);
+				
+				if empty_clause {
+					//undo propagation based on history stack
+					while let Some((lit, next)) = hist.pop() {
+						let var = lit.var_num();
+						let val = lit.get_value();
+						
+						if var < front_pt {
+							front_pt -= var;
+						}
+						//undo propagation
+						self.propagate(var, val, false);
+						self.model.var[var] = LUndef;
+						match next {
+							//if the var can be another value, use that value for next iteration
+							Some(lit) => {next_lit = Some((lit, None)); break;},
+							//check if the history is empty
+							None => if hist.len() == 0 {self.status = false;return false;},
+						}
+					}
+				}else {
+					//if length is 0, the CNF is sat
+					if self.len == 0 {
+						break;
+					}
+					next_lit = None;
+				}
+			}
+			println!("Total iteration: {}", cnt);
 		}
 		self.status
-	}
-	
-	fn recur_solve(&mut self) -> bool {
-		let mut empty_clause = false;
-		let mut all_sat = true;
-		let mut assignments = Vec::<Lit>::new();
-		
-		//check if CNF is sat, unsat, or undetermined and find if there is any assignment 
-		for i in 0..self.len {
-			if self.cnf.sat[i] == 0 {
-				all_sat = false;
-				
-				//empty clause means unsat
-				if self.cnf.clauses[i].len() == 0 {
-					empty_clause = true;
-					break;
-				//check if it is unit clause
-				}else if self.cnf.clauses[i].len() == 1 {
-					assignments.push(self.cnf.clauses[i].get_first().unwrap());
-				}
-			}
-		}
-			
-		if empty_clause {
-			false
-		}else if all_sat {
-			true
-		}else if assignments.len() != 0 {
-			//list of lits that values are propagated
-			let mut proped_lits = Vec::<Lit>::new(); 
-			
-			{
-				let mut set = HashSet::<usize>::new();
-				for lit in assignments {
-					//check if this var has been propagated
-					if set.contains(&lit.var_num()) {
-						continue;
-					}
-					//add to history
-					set.insert(lit.var_num());
-					proped_lits.push(lit);
-					
-					//propagate the value forward
-					let var_num = lit.var_num();
-					let var_value = lit.get_value();
-					self.model.var[var_num] = var_value;
-					self.propagate(var_num, var_value == LTrue, true);
-				}
-			}
-			
-			if !self.recur_solve() {
-				//undo the propagation
-				for lit in proped_lits {
-					let var_num = lit.var_num();
-					let var_value = lit.get_value();
-					self.model.var[var_num] = LUndef;
-					self.propagate(var_num, var_value == LTrue, false);
-				}
-				false
-			}else {
-				true
-			}
-		}else {
-			//choose one var and assign a value
-			let var_num = self.choose_var();
-			
-			//set the value to be true
-			self.model.var[var_num] = LTrue;
-			self.propagate(var_num, true, true);
-			
-			//if CNF is sat under the assignment
-			if !self.recur_solve() {
-				//undo the propagation
-				self.propagate(var_num, true, false);
-				
-				//set the value to be false
-				self.model.var[var_num] = LFalse;
-				self.propagate(var_num, false, true);
-				
-				//if CNF is sat under the assignment
-				if !self.recur_solve() {
-					//undo the propagation
-					self.model.var[var_num] = LUndef;
-					self.propagate(var_num, false, false);
-					return false;
-				}
-			}
-			true
-		}
-	}
-	
-	//choose a variable based on how many times it appears
-	fn choose_var(&self) -> usize {
-		let mut max_cnt = 0;
-		let mut var_num = 0;
-		for i in 0..self.num_var {
-			if self.model.map.get_cnt(i) > max_cnt && !self.model.propagated[i] {
-				max_cnt = self.model.map.get_cnt(i); 
-				var_num = i;
-			}
-		}
-		var_num
 	}
 	
 	//reset the solver to the state before solving and simplifying
 	pub fn reset(&mut self) {
 		for i in 0..self.model.len() {
 			self.model.propagated[i] = false;
+			self.model.expected[i] = (LUndef, 0);
 			self.model.var[i] = LUndef;
 		}
-		for i in 0..self.len {
+		for i in 0..self.cnf.len() {
 			self.cnf.sat[i] = 0;
 			self.cnf.clauses[i].restore_all();
 			if self.cnf.clauses[i].len() == 1 {
@@ -417,13 +442,13 @@ impl Solver {
 impl fmt::Display for Solver {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		let mut first = true;
-		for i in 0..self.cnf.len() {
+		for (i, c) in self.cnf.clauses.iter().enumerate() {
 			if self.cnf.sat[i] == 0 {
 				if !first {
 					write!(f, "/\\").unwrap();
 				}
 				first = false;
-				write!(f, "{}", self.cnf.clauses[i]).unwrap();
+				write!(f, "{}", c).unwrap();
 			}
 		}
 		write!(f, "")
