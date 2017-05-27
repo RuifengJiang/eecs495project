@@ -1,4 +1,4 @@
-use sat::sat::*;
+use sat::sat_lib::*;
 use std::vec::Vec;
 use rand::Rng;
 use time::now;

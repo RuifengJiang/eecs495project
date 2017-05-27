@@ -1,4 +1,5 @@
-use sat::VarValue::*;
+use sat_lib::VarValue::*;
+
 use std::fmt;
 use std::collections::HashSet;
 use std::ops::Not;

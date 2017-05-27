@@ -4,7 +4,7 @@ use std::io::BufReader;
 use std::fs::OpenOptions;
 use std::fmt;
 
-use sat::sat::*;
+use sat::sat_lib::*;
 use sudoku::mapper::*;
 
 mod mapper;
