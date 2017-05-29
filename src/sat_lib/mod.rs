@@ -6,17 +6,39 @@ use std::ops::Not;
 use std::cmp::Ordering;
 
 #[derive (Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+///Used to represent variable used in CNF.
 pub struct Var {
+	///Index number of variables. 
 	num: usize
 }
 
 impl Var {
+	///Create a new variable using given index number.
+	///
+	///# Examples
+	///
+	/// ```
+	///let v = Var::new(4);
+	///
+	///println!("{}", v); //4
+	/// ```
+	///
 	pub fn new(num: usize) -> Self {
 		Var {
 			num: num,
 		}
 	}
 	
+	///Return index number of the variable.
+	///
+	///# Examples
+	///
+	/// ```
+	///let v = Var::new(5);
+	///
+	///println!("{}", v.var_num); //5
+	/// ```
+	///
 	pub fn get_num(&self) -> usize {
 		self.num
 	}
@@ -29,10 +51,37 @@ impl fmt::Display for Var {
 }
 
 #[derive (Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub enum VarValue {VTrue, VFalse, VUndef}
+///Used to represent the value of variable.
+///
+///# Examples
+///
+///```
+///
+///println!("{}", VTrue);  //T
+///println!("{}", VFalse); //F
+///println!("{}", VUndef); //X
+pub enum VarValue {
+	///true
+	VTrue, 
+	///false
+	VFalse, 
+	///either true or false
+	VUndef,
+}
 
 impl VarValue {
-	// Unlike ==, VTrue.equals(VUndef) == true
+	///Check if the values are equal.
+	///
+	///# Examples
+	///
+	///```
+	///let t = VTrue;
+	///
+	///println!("{}", t.equals(VTrue));  //true
+	///println!("{}", t.equals(VFalse)); //false
+	///println!("{}", t.equals(VUndef)); //true
+	///
+	///```
 	pub fn equals(self, other: VarValue) -> bool {
 		match self {
 			VTrue => match other {
@@ -73,12 +122,26 @@ impl fmt::Display for VarValue {
 }
 
 #[derive (Debug, Copy, Clone, PartialEq, Eq, Hash)]
+///Used to represent literals in CNF
 pub struct Lit {
+	///Corresponding variable
 	var: 	Var,
+	///The value of literal
 	value: 	VarValue,
 }
 
 impl Lit {
+	///Create a new literal
+	///
+	///# Examples
+	///
+	///```
+	///
+	///let v = Var::new(5);
+	///let x0 = Lit::new(v);
+	///
+	///println!("x0 = {}, !x0 = {}", x0, !x0); //x0 = 5, !x0 = ~5
+	///```
 	pub fn new(var: Var) -> Self {
 		Lit {
 			var: 	var,
@@ -93,14 +156,49 @@ impl Lit {
 		}
 	}
 	
+	///Get the index number of the variable
+	///
+	///# Examples
+	///
+	///```
+	///let v = Var::new(5);
+	///let x0 = Lit::new(v);
+	///let x0_num = x0.var_num();
+	///
+	///println!("v_num = {}", v_num); //v_num = 5
+	///```
 	pub fn var_num(&self) -> usize {
 		self.var.get_num()
 	}
 	
+	///Get the value of the variable
+	///
+	///# Examples
+	///
+	///```
+	///let v = Var::new(5);
+	///let x0 = Lit::new(v);
+	///
+	///println!("x0 value = {}, !x0 value = {}", x0.get_value(), !x0.get_value()); // x0 = T, !x0 = F
+	///```
 	pub fn get_value(&self) -> VarValue {
 		self.value
 	}
 	
+	///Given a list of variables, create and return a list of responding literals
+	///
+	///# Examples
+	///
+	///```
+	///let mut solver = Solver::new();
+	///let vars = solver.create_vars(100);
+	///let x = create_lits(&vars);
+	///
+	///solver.add_clause_from_lits(vec![x[0], !x[2], x[80]]);
+	///solver.add_clause_from_lits(vec![!x[57], x[24]);
+	///
+	///println!("{}", solver); //(0\/~2\/80)/\(~57\/24)
+	///```
 	pub fn create_lits(vars: &[Var]) -> Vec<Lit> {
 		let mut lits = Vec::<Lit>::new();
 		for i in vars {
@@ -144,9 +242,13 @@ impl fmt::Display for Lit {
 }
 
 #[derive (Debug, Clone)]
+///Used to represent clauses
 pub struct Clause {
+	///Literals in the clause
 	vec_lit: 	Vec<(Lit, bool)>,
+	///The max index number of literals in the clause
 	max_lit: 	Option<usize>,
+	///The number of literals, which are not logically removed, in the clause
 	len: 		usize,
 }
 
@@ -159,7 +261,20 @@ impl Clause {
 		}
 	}
 	
-	//add literal at the end of the clause
+	///Push a literal at the end of the clause
+	///
+	///# Examples
+	///
+	///```
+	///let x0 = Lit::new(Var::new(0));
+	///let x1 = Lit::new(Var::new(1));
+	///
+	///let mut c = Clause::new();
+	///c.push(x[0]);
+	///c.push(!x[1]);
+	///
+	///println!("{}", c); // (0\/~1)
+	///```
 	pub fn push(&mut self, lit: Lit) {
 		match self.max_lit {
 			Some(max_lit) => if max_lit < lit.var_num() {self.max_lit = Some(lit.var_num());},
@@ -169,13 +284,48 @@ impl Clause {
 		self.len += 1;
 	}
 	
+	///get the number of literals in the clause
+	///
+	///# Examples
+	///
+	///```
+	///let x0 = Lit::new(Var::new(0));
+	///let x1 = Lit::new(Var::new(1));
+	///
+	///let mut c = Clause::new();
+	///c.push(x[0]);
+	///c.push(!x[1]);
+	///
+	///println!("{}", c.len()); // 2
+	///```
 	pub fn len(&self) -> usize {
 		self.len
 	}
 	
-	//return all lits, including those are marked
-	pub fn get_all_lits(&self) -> &[(Lit, bool)] {
-		&self.vec_lit
+	///return all lits, including those are marked
+	///
+	///# Examples
+	///
+	///```
+	///let x0 = Lit::new(Var::new(0));
+	///let x1 = Lit::new(Var::new(1));
+	///
+	///let mut c = Clause::new();
+	///c.push(x[0]);
+	///c.push(!x[1]);
+	///
+	///println!("{}", c.get_all_lits()[1]); //~1
+	///```
+	pub fn get_all_lits(&self) -> Vec<Lit> {
+		let mut v = Vec::<Lit>::new();
+		
+		for i in &self.vec_lit {
+			if !i.1 {
+				v.push(i.0);
+			}
+		}
+		
+		v
 	}
 	
 	//get first lit that is not marked
@@ -192,7 +342,7 @@ impl Clause {
 	}
 	
 	//logically remove one lit
-	pub fn remove(&mut self, idx: usize) {
+	fn remove(&mut self, idx: usize) {
 		if !self.vec_lit[idx].1 {
 			self.vec_lit[idx].1 = true;
 			self.len -= 1;
@@ -200,7 +350,7 @@ impl Clause {
 	}
 	
 	//restore the removed lit
-	pub fn restore(&mut self, idx: usize) {
+	fn restore(&mut self, idx: usize) {
 		if self.vec_lit[idx].1 {
 			self.vec_lit[idx].1 = false;
 			self.len += 1;
@@ -208,7 +358,7 @@ impl Clause {
 	}
 	
 	//restore all lits, including not removed ones
-	pub fn restore_all(&mut self) {
+	fn restore_all(&mut self) {
 		self.len = self.vec_lit.len();
 		for i in 0..self.len {
 			self.vec_lit[i].1 = false;
@@ -329,8 +479,7 @@ impl VarMap {
 	//add a new clause
 	fn add_clause(&mut self, idx: usize, clause: &Clause) {
 		let lits = clause.get_all_lits();
-		for (i, tuple) in lits.iter().enumerate() {
-			let lit = tuple.0;
+		for (i, lit) in lits.iter().enumerate() {
 			let var_num = lit.var_num();
 			self.cnt[var_num] += 1;
 			
@@ -352,6 +501,7 @@ impl VarMap {
 }
 
 #[derive (Debug)]
+///SAT Solver
 pub struct Solver {
 	cnf: 		CNF,	//CNF  
 	len: 		usize,
@@ -362,6 +512,21 @@ pub struct Solver {
 }
 
 impl Solver {
+	///Create a new SAT Solver
+	///
+	///# Examples
+	///
+	///```
+	///let mut solver = Solver::new();
+	///let vars = solver.create_vars(100);
+	///let x = create_lits(&vars);
+	///
+	///solver.add_clause_from_lits(vec![x[0], !x[2], x[80]]);
+	///println!("{}", solver); //(0\/~2\/80)
+	///
+	///solver.add_clause_from_lits(vec![!x[57], x[24]);
+	///println!("{}", solver); //(0\/~2\/80)/\(~57\/24)
+	///```
 	pub fn new() -> Self {
 		Solver {
 			cnf: 		CNF::new(),
@@ -373,7 +538,21 @@ impl Solver {
 		}
 	}
 	
-	//create multiple variables
+	///Create multiple variables
+	///
+	///# Examples
+	///
+	///```
+	///let mut solver = Solver::new();
+	///let vars = solver.create_vars(100);
+	///let x = create_lits(&vars);
+	///
+	///solver.add_clause_from_lits(vec![x[0], !x[2], x[80]]);
+	///println!("{}", solver); //(0\/~2\/80)
+	///
+	///solver.add_clause_from_lits(vec![!x[57], x[24]);
+	///println!("{}", solver); //(0\/~2\/80)/\(~57\/24)
+	///```
 	pub fn create_vars(&mut self, num: usize) -> Vec<Var> {
 		let mut vars = Vec::<Var>::new();
 		
@@ -384,7 +563,21 @@ impl Solver {
 		vars
 	}
 	
-	//create a new variable
+	//Create a new variable
+	///
+	///# Examples
+	///
+	///```
+	///let mut solver = Solver::new();
+	///let v0 = solver.new_var();
+	///let v1 = solver.new_var();
+	///let x0 = Lit::new(v0);
+	///let x1 = Lit::new(v1);
+	///
+	///solver.add_clause_from_lits(vec![x0]);
+	///solver.add_clause_from_lits(vec![!x1]);
+	///println!("{}", solver); //(0)/\(~1)
+	///```
 	pub fn new_var(&mut self) -> Var {
 		let num = self.num_var;
 		self.model.new_var();
@@ -392,11 +585,40 @@ impl Solver {
 		Var::new(num)
 	}
 	
-	pub fn set_iter_num(&mut self, num: usize) {
+	///Set the frequency of printing iteration number. If num is 0, solver will not print iterations number.
+	///
+	///# Examples
+	///
+	///```
+	///let mut solver = Solver::new();
+	///solver.set_iter_print_freq(1000); //print iteration number of every 1000 iterations.
+	///```
+	pub fn set_iter_print_freq(&mut self, num: usize) {
 		self.iter_num = num;
 	}
 	
-	//add one clause into the solver
+	///add one clause into the solver
+	///
+	///# Examples
+	///
+	///```
+	///let mut solver = Solver::new();
+	///let v0 = solver.new_var();
+	///let v1 = solver.new_var();
+	///let x0 = Lit::new(v0);
+	///let x1 = Lit::new(v1);
+	///
+	///let mut c0 = Clause::new();
+	///c0.push(x0);
+	///c0.push(!x1);
+	///
+	///let mut c1 = Clause::new();
+	///c1.push(!x0);
+	///
+	///solver.add_clause(c0);
+	///solver.add_clause(c1);
+	///println!("{}", solver); //(0\/~1)/\(~0)
+	///```
 	pub fn add_clause(&mut self, clause: Clause) -> Result<bool, String> {
 		if self.status {
 			if clause.len() == 0 {
@@ -438,7 +660,21 @@ impl Solver {
 		}
 	}
 	
-	//create a clause from vector of literals and add into the solver
+	///Create a clause from a list of literals and add into the solver
+	///
+	///# Examples
+	///
+	///```
+	///let mut solver = Solver::new();
+	///let v0 = solver.new_var();
+	///let v1 = solver.new_var();
+	///let x0 = Lit::new(v0);
+	///let x1 = Lit::new(v1);
+	///
+	///solver.add_clause_from_lits(vec![x0]);
+	///solver.add_clause_from_lits(vec![!x1]);
+	///println!("{}", solver); //(0)/\(~1)
+	///```
 	pub fn add_clause_from_lits(&mut self, lits: Vec<Lit>) -> Result<bool, String> {
 		let mut c = Clause::new();
 		for i in lits {
@@ -447,14 +683,92 @@ impl Solver {
 		self.add_clause(c)
 	}
 	
+	///Return the model (value of variables) of CNF.
+	///
+	///# Examples
+	///
+	///```
+	///let mut solver = Solver::new();
+	///let v0 = solver.new_var();
+	///let v1 = solver.new_var();
+	///let x0 = Lit::new(v0);
+	///let x1 = Lit::new(v1);
+	///
+	///let mut c0 = Clause::new();
+	///c0.push(x0);
+	///c0.push(!x1);
+	///
+	///let mut c1 = Clause::new();
+	///c1.push(!x0);
+	///
+	///solver.add_clause(c0);
+	///solver.add_clause(c1);
+	///
+	///solver.solve();
+	///
+	///let model = solver.get_model();
+	///println!("{}", model[0]); //F
+	///println!("{}", model[1]); //F
+	///```
 	pub fn get_model(&self) -> &[VarValue] {
 		&self.model.var
 	}
 	
+	///Return a list of original clauses.
+	///
+	///# Examples
+	///
+	///```
+	///let mut solver = Solver::new();
+	///let v0 = solver.new_var();
+	///let v1 = solver.new_var();
+	///let x0 = Lit::new(v0);
+	///let x1 = Lit::new(v1);
+	///
+	///let mut c0 = Clause::new();
+	///c0.push(x0);
+	///c0.push(!x1);
+	///
+	///let mut c1 = Clause::new();
+	///c1.push(!x0);
+	///
+	///solver.add_clause(c0);
+	///solver.add_clause(c1);
+	///
+	///solver.siimplify();
+	///
+	///let clauses = solver.get_oringin_clauses();
+	///println!("{}", clauses[0]); //(0\/~1)
+	///println!("{}", clauses[1]); //(~0)
+	///```
 	pub fn get_oringin_clauses(&self) -> Vec<Clause> {
 		self.cnf.clauses.clone()
 	}
 	
+	///Print the model (value of variables) of CNF.
+	///
+	///# Examples
+	///
+	///```
+	///let mut solver = Solver::new();
+	///let v0 = solver.new_var();
+	///let v1 = solver.new_var();
+	///let x0 = Lit::new(v0);
+	///let x1 = Lit::new(v1);
+	///
+	///let mut c0 = Clause::new();
+	///c0.push(x0);
+	///c0.push(!x1);
+	///
+	///let mut c1 = Clause::new();
+	///c1.push(!x0);
+	///
+	///solver.add_clause(c0);
+	///solver.add_clause(c1);
+	///
+	///solver.solve();
+	///solve.print_model(); //FF
+	///```
 	pub fn print_model(&self) {
 		if self.status {
 			for var in self.model.var.iter() {
@@ -466,7 +780,34 @@ impl Solver {
 		}
 	}
 	
-	//simplify the CNF
+	///Simplify the CNF
+	///
+	///# Examples
+	///
+	///```
+	///let mut solver = Solver::new();
+	///let v0 = solver.new_var();
+	///let v1 = solver.new_var();
+	///let v2 = solver.new_var();
+	///let x0 = Lit::new(v0);
+	///let x1 = Lit::new(v1);
+	///let x2 = Lit::new(v2);
+	///
+	///let mut c0 = Clause::new();
+	///c0.push(x0);
+	///c0.push(!x1);
+	///c0.push(x2);
+	///
+	///let mut c1 = Clause::new();
+	///c1.push(!x0);
+	///
+	///solver.add_clause(c0);
+	///solver.add_clause(c1);
+	///
+	///println!("{}", solver); //(0\/~1\/2)/\(~0)
+	///solver.siimplify();
+	///println!("{}", solver); //(~1\/2)
+	///```
 	pub fn simplify(&mut self) -> bool{
 		if self.status {
 			loop {
@@ -588,6 +929,30 @@ impl Solver {
 		result
 	}
 
+	///Solve the CNF
+	///
+	///# Examples
+	///
+	///```
+	///let mut solver = Solver::new();
+	///let v0 = solver.new_var();
+	///let v1 = solver.new_var();
+	///let x0 = Lit::new(v0);
+	///let x1 = Lit::new(v1);
+	///
+	///let mut c0 = Clause::new();
+	///c0.push(x0);
+	///c0.push(!x1);
+	///
+	///let mut c1 = Clause::new();
+	///c1.push(!x0);
+	///
+	///solver.add_clause(c0);
+	///solver.add_clause(c1);
+	///
+	///solver.solve();
+	///solve.print_model(); //FF
+	///```
 	pub fn solve(&mut self) -> bool {
 		if self.status {
 			if !self.simplify() {
@@ -701,7 +1066,7 @@ impl Solver {
 		self.status
 	}
 	
-	//reset the solver to the state before solving and simplifying
+	///Reset the solver to the state before solving and simplifying
 	pub fn reset(&mut self) {
 		for i in 0..self.model.len() {
 			self.model.propagated[i] = false;

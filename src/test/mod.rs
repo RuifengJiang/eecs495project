@@ -104,7 +104,7 @@ fn random_efficiency_test(num: usize) {
 			let clause_mn = 100000.;	// number of clauses
 			let assign_mn = 20.;	// number of assignments (unit clauses)
 			
-			solver.set_iter_num(var_n * 2);
+			solver.set_iter_print_freq(var_n / 5);
 			
 			println!("Random Test {}: \n\tVar num: {}\n\tMax clause num: {}\n\tMax clause size: {}\n\tMax assignment num: {}\n", i + 1, var_n, clause_mn, clause_ms as usize, assign_mn as usize); 
 			
@@ -158,8 +158,7 @@ fn verify(clauses: &[Clause], model: &[VarValue]) -> bool {
 	for clause in clauses {
 		let lits = clause.get_all_lits();
 		let mut result = false;
-		for j in lits {
-			let lit = j.0;
+		for lit in lits {
 			if lit.get_value() == model[lit.var_num()] {
 				result = true;
 				break;

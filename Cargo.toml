@@ -3,6 +3,10 @@ name = "sat"
 version = "0.1.0"
 authors = ["Ruifeng"]
 
+[[bin]]
+name = "sat"
+doc = false
+
 [dependencies]
 rand = "0.3"
 time = "0.1.37"
