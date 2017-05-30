@@ -9,14 +9,19 @@ use sudoku::mapper::*;
 
 mod mapper;
 
-pub fn sudoku() {
+pub fn sudoku(in_file: Option<String>) {
 	let mut s = Mapper::new();
 	s.build_clauses();
 	File::create("foo.txt").unwrap();
 	let mut file = OpenOptions::new().read(true).write(true).append(true).open("./foo.txt").unwrap();
 	file.write(s.out.as_bytes()).unwrap();
-
-	let file_puzzle = File::open("./s3.txt").unwrap();
+	
+	let file_name;
+	match in_file {
+		Some(name) => file_name = name,
+		None => file_name = "./SudokuPuzzle.txt".to_string(),
+	}
+	let file_puzzle = File::open(file_name).unwrap();
 	let reader = BufReader::new(file_puzzle);
 
 	let mut input = Vec::new();
@@ -70,7 +75,7 @@ pub fn sudoku() {
 							lits.push(Lit::new(Var::new(num as usize)));
 						}
 					}
-				} 
+				}
 				if lits.len() != 0 {
 					solver.add_clause_from_lits(lits).unwrap();
 				}
@@ -79,7 +84,11 @@ pub fn sudoku() {
 			Err(_) => {},
 		}
 	}
-	solver.solve();
+	let sat = solver.solve();
+	if !sat {
+		println!("No Solution");
+		return;
+	}
 	let res = solver.get_model();
 
 	let mut v = Vec::new();

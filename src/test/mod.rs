@@ -1,5 +1,6 @@
 use sat::sat_lib::*;
 use std::vec::Vec;
+use std::collections::HashSet;
 use rand::Rng;
 use time::now;
 
@@ -8,13 +9,20 @@ extern crate rand;
 extern crate time;
 
 pub fn test() {
+	println!("**************************************************************");
+	println!("****************         Sample  Test         ****************");
+	println!("**************************************************************\n");
 	sat_test();
 
-	println!("Correctness Test: ");
-	random_correctness_test(1000);
+	println!("\n**************************************************************");
+	println!("****************       Correctness Test       ****************");
+	println!("**************************************************************\n");
+	random_correctness_test(5000);
 
-	println!("\nEfficiency Test: ");
-	random_efficiency_test(3);
+	println!("\n**************************************************************");
+	println!("****************       Efficiency  Test       ****************");
+	println!("**************************************************************\n");
+	random_efficiency_test(5);
 }
 
 fn sat_test() {
@@ -41,19 +49,20 @@ fn sat_test() {
 	solver.add_clause_from_lits(vec![x[2], !x[2]]).unwrap();
 	solver.add_clause_from_lits(vec![x[2], x[7], !x[0]]).unwrap();
 	solver.add_clause_from_lits(vec![x[4], x[6]]).unwrap();
-	solver.add_clause_from_lits(vec![]).unwrap();
+//	solver.add_clause_from_lits(vec![]).unwrap();
 	
 	println!("{}", solver);	
-//	solver.simplify();
-//	println!("{}", solver);	
-	println!("{}", solver.solve());
+	let clauses = solver.get_oringin_clauses();
+	let sat = solver.solve();
+	println!("Match: {}", if sat {verify(&clauses, solver.get_model())} else {verify_unsat(&clauses, 10)});
+	print!("Model: ");
 	solver.print_model();
 }
 
 fn random_correctness_test(num: usize) {
 	let mut sat_case = 0;
 	let mut unsat_case = 0;
-	for i in 0..num {
+	for i in 1..num + 1 {
 		if i % 1000 == 0 {
 			println!("Correctness test num: {}", i);
 		} 
@@ -91,22 +100,25 @@ fn random_correctness_test(num: usize) {
 			}
 		}
 	}
+	println!("\nTotal num of test: {}", num);
 	println!("Num of sat: {}\tNum of unsat: {}", sat_case, unsat_case);
 	println!("Test Passed");
 }
 
 fn random_efficiency_test(num: usize) {
+	let var_n = 10000;		// number of variables
+	let clause_ms = 40.;	// max size of each clause
+	let clause_mn = 100000.;	// number of clauses
+	let assign_mn = 20.;	// number of assignments (unit clauses)
+	println!("\tVar num: {}\n\tMax clause num: {}\n\tMax clause size: {}\n\tMax assignment num: {}\n", var_n, clause_mn, clause_ms as usize, assign_mn as usize);
+	
 	for i in 0..num {
 		let mut solver = Solver::new();
 		{
-			let var_n = 10000;		// number of variables
-			let clause_ms = 40.;	// max size of each clause
-			let clause_mn = 100000.;	// number of clauses
-			let assign_mn = 20.;	// number of assignments (unit clauses)
 			
-			solver.set_iter_print_freq(var_n / 5);
+			println!("Random Test: {}\n", i + 1);
 			
-			println!("Random Test {}: \n\tVar num: {}\n\tMax clause num: {}\n\tMax clause size: {}\n\tMax assignment num: {}\n", i + 1, var_n, clause_mn, clause_ms as usize, assign_mn as usize); 
+			solver.set_iter_print_freq(var_n / 5);			 
 			
 			let mut lits = Vec::<Lit>::new();
 			
@@ -116,7 +128,6 @@ fn random_efficiency_test(num: usize) {
 		
 			println!("Generating CNF...\n");	
 			random_clauses(&mut solver, lits, var_n as f32, clause_ms, clause_mn, assign_mn, true);
-	//		println!("{}", solver);
 		}
 		
 		let clauses = solver.get_oringin_clauses();
@@ -129,12 +140,16 @@ fn random_efficiency_test(num: usize) {
 		let duration = end_time - start_time;
 		print!("Total time: {}.{} s\t", duration.num_seconds(), duration.num_milliseconds() - duration.num_seconds() * 1000);
 		
-//		solver.print_model();
-		
 		print!("SAT: {}\t", sat);
-		println!("Result Match: {}\n\n======================================================\n", if sat {verify(&clauses, solver.get_model())} else {true});
+		let res = if sat {verify(&clauses, solver.get_model())} else {true};
+		println!("Result Match: {}\n\n------------------------------------------------\n", res);
+		if !res {
+			println!("Error");
+			return;
+		}
 		solver.reset();
 	}
+	println!("Test Passed");
 }
 
 fn verify_unsat(clauses: &[Clause], var_num: usize) -> bool {
@@ -175,8 +190,17 @@ fn random_clauses(solver: &mut Solver, x: Vec<Lit>, lit_n: f32, clause_ms: f32, 
 	let mut rng = rand::thread_rng();
 	
 	let assign_n = (rng.next_f32() * assign_mn).floor() as usize;
+	let mut set = HashSet::<usize>::with_capacity(assign_n);
+	
 	for _ in 0..assign_n {
-		let lit_num = (rng.next_f32() * lit_n).floor() as usize;
+		let mut lit_num;
+		loop {
+			lit_num = (rng.next_f32() * lit_n).floor() as usize;
+			if !set.contains(&lit_num) {
+				set.insert(lit_num);
+				break;
+			}
+		}
 		if rng.gen() {
 			solver.add_clause_from_lits(vec![x[lit_num]]).unwrap();
 		}else {

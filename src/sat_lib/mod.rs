@@ -60,6 +60,7 @@ impl fmt::Display for Var {
 ///println!("{}", VTrue);  //T
 ///println!("{}", VFalse); //F
 ///println!("{}", VUndef); //X
+///```
 pub enum VarValue {
 	///true
 	VTrue, 
@@ -194,8 +195,8 @@ impl Lit {
 	///let vars = solver.create_vars(100);
 	///let x = create_lits(&vars);
 	///
-	///solver.add_clause_from_lits(vec![x[0], !x[2], x[80]]);
-	///solver.add_clause_from_lits(vec![!x[57], x[24]);
+	///solver.add_clause_from_lits(vec![x[0], !x[2], x[80]]).unwrap();
+	///solver.add_clause_from_lits(vec![!x[57], x[24]).unwrap();
 	///
 	///println!("{}", solver); //(0\/~2\/80)/\(~57\/24)
 	///```
@@ -521,10 +522,10 @@ impl Solver {
 	///let vars = solver.create_vars(100);
 	///let x = create_lits(&vars);
 	///
-	///solver.add_clause_from_lits(vec![x[0], !x[2], x[80]]);
+	///solver.add_clause_from_lits(vec![x[0], !x[2], x[80]]).unwrap();
 	///println!("{}", solver); //(0\/~2\/80)
 	///
-	///solver.add_clause_from_lits(vec![!x[57], x[24]);
+	///solver.add_clause_from_lits(vec![!x[57], x[24]).unwrap();
 	///println!("{}", solver); //(0\/~2\/80)/\(~57\/24)
 	///```
 	pub fn new() -> Self {
@@ -547,10 +548,10 @@ impl Solver {
 	///let vars = solver.create_vars(100);
 	///let x = create_lits(&vars);
 	///
-	///solver.add_clause_from_lits(vec![x[0], !x[2], x[80]]);
+	///solver.add_clause_from_lits(vec![x[0], !x[2], x[80]]).unwrap();
 	///println!("{}", solver); //(0\/~2\/80)
 	///
-	///solver.add_clause_from_lits(vec![!x[57], x[24]);
+	///solver.add_clause_from_lits(vec![!x[57], x[24]).unwrap();
 	///println!("{}", solver); //(0\/~2\/80)/\(~57\/24)
 	///```
 	pub fn create_vars(&mut self, num: usize) -> Vec<Var> {
@@ -574,8 +575,8 @@ impl Solver {
 	///let x0 = Lit::new(v0);
 	///let x1 = Lit::new(v1);
 	///
-	///solver.add_clause_from_lits(vec![x0]);
-	///solver.add_clause_from_lits(vec![!x1]);
+	///solver.add_clause_from_lits(vec![x0]).unwrap();
+	///solver.add_clause_from_lits(vec![!x1]).unwrap();
 	///println!("{}", solver); //(0)/\(~1)
 	///```
 	pub fn new_var(&mut self) -> Var {
@@ -597,7 +598,12 @@ impl Solver {
 		self.iter_num = num;
 	}
 	
-	///add one clause into the solver
+	///Add one clause into the solver. Return the solver is still satisfiable or not.
+	///False means USNAT.  
+	///
+	///# Error
+	///
+	///This function will return error if the solver is already unsat.
 	///
 	///# Examples
 	///
@@ -615,13 +621,14 @@ impl Solver {
 	///let mut c1 = Clause::new();
 	///c1.push(!x0);
 	///
-	///solver.add_clause(c0);
-	///solver.add_clause(c1);
+	///solver.add_clause(c0).unwrap();
+	///solver.add_clause(c1).unwrap();
 	///println!("{}", solver); //(0\/~1)/\(~0)
 	///```
 	pub fn add_clause(&mut self, clause: Clause) -> Result<bool, String> {
 		if self.status {
 			if clause.len() == 0 {
+				self.cnf.add_clause(clause);
 				self.status = false;
 				return Ok(self.status);
 			}
@@ -660,7 +667,12 @@ impl Solver {
 		}
 	}
 	
-	///Create a clause from a list of literals and add into the solver
+	///Create a clause from a list of literals and add into the solver. Return the solver is still satisfiable or not.
+	///False means USNAT.  
+	///
+	///# Error
+	///
+	///This function will return error if the solver is already unsat.
 	///
 	///# Examples
 	///
@@ -671,8 +683,8 @@ impl Solver {
 	///let x0 = Lit::new(v0);
 	///let x1 = Lit::new(v1);
 	///
-	///solver.add_clause_from_lits(vec![x0]);
-	///solver.add_clause_from_lits(vec![!x1]);
+	///solver.add_clause_from_lits(vec![x0]).unwrap();
+	///solver.add_clause_from_lits(vec![!x1]).unwrap();
 	///println!("{}", solver); //(0)/\(~1)
 	///```
 	pub fn add_clause_from_lits(&mut self, lits: Vec<Lit>) -> Result<bool, String> {
@@ -701,8 +713,8 @@ impl Solver {
 	///let mut c1 = Clause::new();
 	///c1.push(!x0);
 	///
-	///solver.add_clause(c0);
-	///solver.add_clause(c1);
+	///solver.add_clause(c0).unwrap();
+	///solver.add_clause(c1).unwrap();
 	///
 	///solver.solve();
 	///
@@ -732,8 +744,8 @@ impl Solver {
 	///let mut c1 = Clause::new();
 	///c1.push(!x0);
 	///
-	///solver.add_clause(c0);
-	///solver.add_clause(c1);
+	///solver.add_clause(c0).unwrap();
+	///solver.add_clause(c1).unwrap();
 	///
 	///solver.siimplify();
 	///
@@ -763,8 +775,8 @@ impl Solver {
 	///let mut c1 = Clause::new();
 	///c1.push(!x0);
 	///
-	///solver.add_clause(c0);
-	///solver.add_clause(c1);
+	///solver.add_clause(c0).unwrap();
+	///solver.add_clause(c1).unwrap();
 	///
 	///solver.solve();
 	///solve.print_model(); //FF
@@ -780,7 +792,8 @@ impl Solver {
 		}
 	}
 	
-	///Simplify the CNF
+	///Simplify the CNF. Return if the CNF is still satisfiable.
+	///False means UNSAT.
 	///
 	///# Examples
 	///
@@ -801,12 +814,16 @@ impl Solver {
 	///let mut c1 = Clause::new();
 	///c1.push(!x0);
 	///
-	///solver.add_clause(c0);
-	///solver.add_clause(c1);
+	///solver.add_clause(c0).unwrap();
+	///solver.add_clause(c1).unwrap();
 	///
 	///println!("{}", solver); //(0\/~1\/2)/\(~0)
-	///solver.siimplify();
-	///println!("{}", solver); //(~1\/2)
+	///let sat = solver.siimplify();
+	///if sat {
+	///	println!("{}", solver); //(~1\/2)
+	///}else {
+	///	println!("UNSAT");
+	///}
 	///```
 	pub fn simplify(&mut self) -> bool{
 		if self.status {
@@ -929,7 +946,8 @@ impl Solver {
 		result
 	}
 
-	///Solve the CNF
+	///Solve the CNF. Return if the CNF is still satisfiable.
+	///False means UNSAT.
 	///
 	///# Examples
 	///
@@ -947,11 +965,13 @@ impl Solver {
 	///let mut c1 = Clause::new();
 	///c1.push(!x0);
 	///
-	///solver.add_clause(c0);
-	///solver.add_clause(c1);
+	///solver.add_clause(c0).unwrap();
+	///solver.add_clause(c1).unwrap();
 	///
-	///solver.solve();
-	///solve.print_model(); //FF
+	///let sat = solver.solve();
+	///if sat {
+	///	solve.print_model(); //FF
+	///}
 	///```
 	pub fn solve(&mut self) -> bool {
 		if self.status {
@@ -966,9 +986,6 @@ impl Solver {
 			
 			loop {
 				cnt += 1;
-//				if cnt > 15  {
-//					break;
-//				}
 				if self.iter_num != 0 && cnt % self.iter_num == 0 {
 					println!("Iteration: {}", cnt);
 				}
@@ -1007,14 +1024,6 @@ impl Solver {
 				let var = lit.var_num();
 				let value;
 				
-//				println!("{}", self);
-//				self.print_model();
-//				println!("{}", lit);
-//				for i in assignment_set.iter() {
-//					print!("{}, ", i)
-//				}
-//				println!();
-									
 				//check if is an assignment from original CNF
 				if self.model.var[var] == VUndef {
 					value = lit.get_value();
@@ -1029,8 +1038,6 @@ impl Solver {
 				
 				//propagate the value and get if there is any empty clause
 				let empty_clause = self.propagate(var, value, true, Some(&mut assignment_set));
-				
-//				println!("{}", self);
 				
 				if empty_clause {
 					//undo propagation based on history stack
@@ -1060,7 +1067,7 @@ impl Solver {
 				}
 			}
 			if self.iter_num != 0 {
-				println!("Total iteration: {}", cnt);
+				println!("\nTotal iteration: {}", cnt);
 			}
 		}
 		self.status

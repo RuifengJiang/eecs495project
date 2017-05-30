@@ -15,7 +15,7 @@ fn main() {
 		if arg == "test" {
 			test::test();
 		}else if arg == "sudoku" {
-			sudoku::sudoku();		
+			sudoku::sudoku(args.next());
 		}
 	}
 }
