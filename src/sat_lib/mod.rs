@@ -248,7 +248,7 @@ pub struct Clause {
 	///Literals in the clause
 	vec_lit: 	Vec<(Lit, bool)>,
 	///The max index number of literals in the clause
-	max_lit: 	Option<usize>,
+	max_var: 	Option<usize>,
 	///The number of literals, which are not logically removed, in the clause
 	len: 		usize,
 }
@@ -257,7 +257,7 @@ impl Clause {
 	pub fn new() -> Self {
 		Clause {
 			vec_lit: 	Vec::<(Lit, bool)>::new(),
-			max_lit: 	None,
+			max_var: 	None,
 			len: 		0,
 		}
 	}
@@ -277,9 +277,9 @@ impl Clause {
 	///println!("{}", c); // (0\/~1)
 	///```
 	pub fn push(&mut self, lit: Lit) {
-		match self.max_lit {
-			Some(max_lit) => if max_lit < lit.var_num() {self.max_lit = Some(lit.var_num());},
-			None => self.max_lit = Some(lit.var_num()), 
+		match self.max_var {
+			Some(max_lit) => if max_lit < lit.var_num() {self.max_var = Some(lit.var_num());},
+			None => self.max_var = Some(lit.var_num()), 
 		};
 		self.vec_lit.push((lit, false));
 		self.len += 1;
@@ -368,7 +368,7 @@ impl Clause {
 	
 	//check if this clause is a valid clause, i.e. all lits are valid in the solver
 	fn get_max(&self) -> Option<usize> {
-		if let Some(var_num) = self.max_lit {
+		if let Some(var_num) = self.max_var {
 			Some(var_num)
 		}else {
 			None
@@ -887,8 +887,10 @@ impl Solver {
 				if self.cnf.sat[j.0] == 0 {
 					self.len -= 1;
 				}
+				//remove the clause
 				self.cnf.sat[j.0] += 1;
 			}else {
+				//restore the clause
 				self.cnf.sat[j.0] -= 1;
 				if self.cnf.sat[j.0] == 0 {
 					self.len += 1;
@@ -898,6 +900,7 @@ impl Solver {
 		for j in unsat_list {
 			if forward {
 				if self.cnf.sat[j.0] == 0 {
+					//remove the literal from the clause
 					self.cnf.clauses[j.0].remove(j.1);
 					//check if the clause is empty
 					let len = self.cnf.clauses[j.0].len();
@@ -940,6 +943,7 @@ impl Solver {
 					}
 				}
 				
+				//restore the literal in the clause
 				self.cnf.clauses[j.0].restore(j.1);
 			}
 		}
@@ -990,6 +994,7 @@ impl Solver {
 					println!("Iteration: {}", cnt);
 				}
 				
+				//decide()
 				//check if need to find a new var to propagate
 				if next_lit == None {
 					while self.model.propagated[front_pt] {
@@ -1036,10 +1041,13 @@ impl Solver {
 					next_lit = None;
 				}
 				
+				//propagate()
 				//propagate the value and get if there is any empty clause
 				let empty_clause = self.propagate(var, value, true, Some(&mut assignment_set));
 				
+				//check if there is conflict
 				if empty_clause {
+					//backtrack()
 					//undo propagation based on history stack
 					while let Some((lit, next)) = hist.pop() {
 						let var = lit.var_num();
@@ -1054,11 +1062,13 @@ impl Solver {
 						match next {
 							//if the var can be another value, use that value for next iteration
 							Some(lit) => {next_lit = Some((lit, None)); break;},
+							//return UNSAT
 							//check if the history is empty
 							None => if hist.len() == 0 {self.status = false;return false;},
 						}
 					}
 				}else {
+					//return SAT
 					//if length is 0, the CNF is sat
 					if self.len == 0 {
 						break;
